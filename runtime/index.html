@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<style>
+  html, body { margin:0; padding:0; background:transparent; overflow:hidden; }
+  /* 容器铺满窗口，居中 stage（配合 transform 缩放） */
+  body { display:flex; align-items:center; justify-content:center; width:100vw; height:100vh; }
+  #stage {
+    position:relative; width:462px; height:260px;
+    background:transparent; overflow:hidden;
+    user-select:none; pointer-events:none;
+    transform-origin:center;
+    transition:transform .18s ease;
+  }
+  video {
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:contain; pointer-events:none;
+    opacity:0; transition:opacity .18s ease;
+    transform-origin:center;
+  }
+  video.is-front { opacity:1; }
+
+  /* 状态气泡：显示在窗口内顶部（避免被裁到窗口外），不可交互 */
+  #bubble {
+    position:absolute;
+    top:6px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,0.75);
+    color:#fff; font:12px/1.4 sans-serif;
+    padding:4px 10px; border-radius:10px;
+    white-space:nowrap;
+    pointer-events:none; /* 不挡操作 */
+    z-index:10;
+    opacity:0; transition:opacity .2s ease;
+  }
+  #bubble::after {
+    content:'';
+    position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    border:5px solid transparent; border-top-color:rgba(0,0,0,0.75);
+  }
+  #bubble.visible { opacity:1; }
+
+  /* 互动区域：覆盖宠物主体，接收拖拽/点击，透明不遮挡 */
+  #hit {
+    position:absolute;
+    left:15%; right:15%; top:5%; bottom:5%;
+    pointer-events:auto; cursor:grab;
+    z-index:2;
+  }
+  #hit.dragging { cursor:grabbing; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <video id="va" autoplay muted loop playsinline class="is-front"></video>
+    <video id="vb" autoplay muted loop playsinline></video>
+    <div id="hit"></div>
+    <div id="bubble"></div>
+  </div>
+
+  <!-- 第 5 步：PetEngine/PetScheduler/PetInteract/PetInit 均已 class 化 -->
+  <script src="js/pet-state.js"></script>
+  <script src="js/pet-engine.js"></script>
+  <script src="js/pet-scheduler.js"></script>
+  <script src="js/pet-interact.js"></script>
+  <script src="js/pet-init.js"></script>
+  <script>window.__pet = new window.PetInit({ bridge: window.petBridge })</script>
+

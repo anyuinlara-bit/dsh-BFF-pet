@@ -1,0 +1,20 @@
+# 依赖
+node_modules/
+
+# Electron 官方二进制（358MB，不入库；发布/本地由 helper 从 bin 部署）
+bin/win32-x64/
+bin/
+
+# 日志与运行时产物
+*.log
+*.tmp
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 环境
+.env
+.env.*

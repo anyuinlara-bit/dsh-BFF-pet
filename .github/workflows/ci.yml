@@ -1,0 +1,32 @@
+# dsh-BFF-pet · 持续集成（CI）冒烟测试
+# 触发：每次 push / PR 到 main 分支自动运行
+# 作用：捕获"最贵、最常见"的两类问题——
+#   1. 语法错误（某个文件解析不了）
+#   2. reducer 状态机逻辑回归（行为被改坏）
+# 说明：本项目无 npm 依赖（纯 Node 内置 + ESM），故无需 npm install。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  smoke:
+    name: Smoke & Reducer Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm' # 无 lock 文件时代无害
+
+      - name: Run smoke test (syntax + reducer)
+        run: npm run smoke

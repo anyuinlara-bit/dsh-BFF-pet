@@ -1,0 +1,5 @@
+- insert:
+    - id: dsh-BFF-pet
+      name: dsh-BFF-pet
+      config:
+        enabled: true

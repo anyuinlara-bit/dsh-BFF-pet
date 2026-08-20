@@ -1,0 +1,38 @@
+{
+  "name": "dsh-BFF-pet",
+  "version": "0.1.0",
+  "description": "BFF Pet: DSH desktop pet in a transparent Electron window with WebM animations, driven by real Agent state.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/",
+    "runtime/",
+    "bin/",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "test": "node --test src/reducer.test.js",
+    "test:reducer": "node --test src/reducer.test.js",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "desktop-pet",
+    "electron"
+  ],
+  "license": "MIT"
+}
