@@ -40,8 +40,43 @@ function defaultWinBase() {
   return 'C:\\Users\\dsh-BFF-pet'
 }
 const WIN_BASE = process.env.BFF_PET_WIN_BASE || defaultWinBase()
-const WIN_ELECTRON = WIN_BASE + '\\electron-dist\\electron.exe'
 const WIN_RUNTIME = WIN_BASE + '\\runtime'
+
+// ── Electron 定位（多候选取第一个可用的）──
+// 只负责"找对路径"，不负责拉取——拉取由使用者/Agent 按环境处理。
+// 纯 Windows：npm install electron 后位于 node_modules/electron/dist/electron.exe，直接可用。
+// WSL：需要 Windows 版 electron（bin/win32-x64 或已同步到 Windows 本地盘的 electron-dist）。
+function electronExeName() {
+  return process.platform === 'win32' ? 'electron.exe' : 'electron'
+}
+
+// 用户 npm install electron 后的标准位置（纯 Windows 场景）
+function npmElectronPath() {
+  return resolve(pluginRoot, 'node_modules', 'electron', 'dist', electronExeName())
+}
+
+// 兼容旧的本地 Windows 版 bin 目录
+function bundledElectronPath() {
+  return resolve(pluginRoot, 'bin', 'win32-x64', 'electron.exe')
+}
+
+// 返回定位到的 Electron 可执行文件路径，找不到返回 null
+function locateElectron(options = {}) {
+  const explicit = options.electronPath || process.env.ELECTRON_PATH
+  if (explicit && existsSync(explicit)) return explicit
+  if (process.platform === 'win32') {
+    // 纯 Windows：npm 拉取的 electron
+    const npm = npmElectronPath()
+    if (existsSync(npm)) return npm
+  }
+  // WSL / 其他：Windows 版 bin（WSL 用它同步到 Windows 后由 cmd.exe 运行）
+  const bundled = bundledElectronPath()
+  if (existsSync(bundled)) return bundled
+  // 兜底：任何已存在的 electron/electron.exe
+  const npm = npmElectronPath()
+  if (existsSync(npm)) return npm
+  return null
+}
 
 function isWSL() {
   try {
@@ -57,30 +92,31 @@ function windowsToWsl(winPath) {
   return `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, '/')}`
 }
 
-// 同步 electron 整个目录 + runtime 到 Windows 本地盘
-// 采用增量覆盖，避免 rmSync 整个目录（Electron 运行时可能占用文件导致 ENOTEMPTY）
+// 同步 runtime（+ WSL 场景下的 Windows 版 electron）到 Windows 本地盘
+// 纯 Windows：runtime 就在本地 C 盘同目录，无需跨盘同步，此函数为空操作。
+// WSL：把 runtime 与 bin/win32-x64（Windows 版 electron）复制到 C:\Users\<user>\AppData\Local\dsh-BFF-pet\
 function syncToWindows() {
-  // WSL 视角的目标路径
-  const wslElectronDir = windowsToWsl(WIN_BASE + '\\electron-dist')
-  const wslRuntimeDir = windowsToWsl(WIN_BASE + '\\runtime')
-  if (!wslElectronDir || !wslRuntimeDir) return
+  if (process.platform === 'win32') return // 纯 Windows：无需跨环境同步
 
-  // electron-dist：先尝试删旧目录（二进制被占用时可跳过），再保证存在并覆盖
-  try {
-    rmSync(wslElectronDir, { recursive: true, force: true })
-  } catch (e) { noteError('sync-rm-electron-dist', e) }
-  mkdirSync(wslElectronDir, { recursive: true })
-  cpSync(resolve(pluginRoot, 'bin', 'win32-x64'), wslElectronDir, { recursive: true })
+  const wslRuntimeDir = windowsToWsl(WIN_RUNTIME)
+  if (!wslRuntimeDir) return
 
   // runtime：增量覆盖（不删整个目录，避免 assets 被托盘图标占用导致 ENOTEMPTY）
   mkdirSync(wslRuntimeDir, { recursive: true })
   cpSync(runtimeDir, wslRuntimeDir, { recursive: true })
 
-  // electron.exe 最终位置（若 electron-dist 删除被跳过，确保覆盖）
-  try {
-    const srcExe = resolve(pluginRoot, 'bin', 'win32-x64', 'electron.exe')
-    cpSync(srcExe, wslElectronDir + '\\electron.exe', { force: true })
-  } catch (e) { noteError('sync-electron-exe', e) }
+  // WSL：把 Windows 版 electron（bin/win32-x64）同步到 Windows 本地盘 electron-dist
+  const bundled = resolve(pluginRoot, 'bin', 'win32-x64')
+  if (existsSync(bundled)) {
+    const wslElectronDir = windowsToWsl(WIN_BASE + '\\electron-dist')
+    if (wslElectronDir) {
+      try {
+        rmSync(wslElectronDir, { recursive: true, force: true })
+      } catch (e) { noteError('sync-rm-electron-dist', e) }
+      mkdirSync(wslElectronDir, { recursive: true })
+      cpSync(bundled, wslElectronDir, { recursive: true })
+    }
+  }
 }
 
 // 杀掉 BFF-pet 的 Electron 进程
@@ -91,7 +127,11 @@ function syncToWindows() {
 //         桌面宠物场景可接受；未来可改为记录自有 PID 精确清理。
 function killBFFElectron() {
   try {
-    execSync('/mnt/c/Windows/System32/cmd.exe /c taskkill /F /IM electron.exe', { stdio: 'ignore', timeout: 8000 })
+    // 纯 Windows 直接用 taskkill；WSL 通过 cmd.exe 调
+    const killCmd = (process.platform === 'win32')
+      ? 'taskkill /F /IM electron.exe'
+      : '/mnt/c/Windows/System32/cmd.exe /c taskkill /F /IM electron.exe'
+    execSync(killCmd, { stdio: 'ignore', timeout: 8000 })
   } catch (e) {
     // taskkill 在没有匹配进程时返回 128（"没有运行的任务"）——这是正常情况，忽略
     // 其余非零为真实失败，记录以便排查
@@ -127,20 +167,41 @@ export class BFFHelper {
   }
 
   #command() {
-    const electronPath = this.options.electronPath || WIN_ELECTRON
+    if (process.platform === 'win32') {
+      // 纯 Windows：定位（npm electron 或 bin）后直接运行
+      const electronPath = locateElectron(this.options)
+      if (!electronPath) {
+        throw new Error(
+          'BFF-pet: Electron 未找到。请先拉取运行环境：\n' +
+          '  npm install electron\n' +
+          '  或用环境变量 ELECTRON_PATH 指定 electron(.exe) 路径'
+        )
+      }
+      return { cmd: electronPath, args: [WIN_RUNTIME], cwd: null }
+    }
 
     if (process.platform === 'linux' && isWSL()) {
-      // WSL 中检查 Windows 路径用 /mnt/c/...
-      const wslCheck = windowsToWsl(electronPath)
-      if (wslCheck && !existsSync(wslCheck)) {
-        throw new Error(`BFF-pet: electron not found: ${electronPath}`)
+      // WSL：需要 Windows 版 electron。优先用已同步到 Windows 本地盘的 electron-dist；
+      // 否则回退 bin/win32-x64（同步函数会将其部署到 Windows 本地盘）
+      const winElectron = WIN_BASE + '\\electron-dist\\electron.exe'
+      const wslCheck = windowsToWsl(winElectron)
+      if (wslCheck && existsSync(wslCheck)) {
+        return { cmd: '/mnt/c/Windows/System32/cmd.exe', args: ['/c', winElectron, WIN_RUNTIME], cwd: '/mnt/c' }
       }
-      return { cmd: '/mnt/c/Windows/System32/cmd.exe', args: ['/c', electronPath, WIN_RUNTIME] }
+      const bundled = bundledElectronPath()
+      if (existsSync(bundled)) {
+        // bin/win32-x64 存在，会由 syncToWindows 部署到 Windows 本地盘
+        logInfo('BFF-pet: electron-dist 尚未同步，期望由 syncToWindows 部署后再启动')
+        throw new Error('BFF-pet: Windows 侧 electron-dist 未就绪（syncToWindows 将部署 bin/win32-x64）')
+      }
+      throw new Error(
+        'BFF-pet: Windows 版 Electron 未找到。请将 Windows 版 electron 放到 bin/win32-x64/electron.exe' +
+        '（或用 BFF_PET_WIN_BASE / 手动部署）。WSL 下 npm install electron 拉取的是 Linux 版，无法驱动 Windows 桌宠。'
+      )
     }
-    if (!existsSync(electronPath)) {
-      throw new Error(`BFF-pet: electron not found: ${electronPath}`)
-    }
-    return { cmd: electronPath, args: [WIN_RUNTIME] }
+
+    // 其他平台：不支持
+    throw new Error(`BFF-pet: 当前平台 (${process.platform}) 不支持 Windows Electron 桌宠`)
   }
 
   start() {
@@ -148,12 +209,12 @@ export class BFFHelper {
     killBFFElectron()
     syncToWindows()
 
-    const { cmd, args } = this.#command()
+    const { cmd, args, cwd } = this.#command()
     this.logger.info?.('BFF-pet: starting electron')
 
     // 传 DSH webServer 地址给 Electron，供其轮询状态端点
     const child = spawn(cmd, args, {
-      cwd: '/mnt/c',
+      cwd: cwd ?? (process.platform === 'win32' ? WIN_BASE : '/mnt/c'),
       env: {
         ...process.env,
         DSH_WEB_URL: this.options.webUrl || process.env.DSH_WEB_URL || 'http://127.0.0.1:3080',
@@ -231,3 +292,6 @@ export class BFFHelper {
     this.spawned = false
   }
 }
+
+// 导出纯逻辑函数，便于单元测试（平台路径识别是本项目桥接的核心）
+export { locateElectron, windowsToWsl, bundledElectronPath, npmElectronPath, electronExeName, isWSL }

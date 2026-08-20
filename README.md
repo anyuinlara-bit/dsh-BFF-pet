@@ -76,23 +76,30 @@ src/errors.js  错误收集            js/pet-*.js       渲染层动画/互动/
 
 ---
 
-## 🖥️ 环境
+## 🖥️ 环境与 Electron 运行时
 
-- **WSL**：DSH 运行在 WSL2（Linux）
-- **Windows**：透明 Electron 窗口 + WebM 动画
-- Electron 二进制与 runtime 由 helper 自动从 WSL 同步到 `C:\Users\<user>\AppData\Local\dsh-BFF-pet\`
+桌宠是 **Windows 原生**应用（透明置顶窗口 + 系统托盘）。运行需要 **Electron 运行时**，程序启动时会**自动探测并匹配本机可用的 Electron 路径**（无需手动配置），按以下顺序定位：
 
----
+1. 环境变量 `ELECTRON_PATH` 显式指定
+2. 纯 Windows：`node_modules/electron/dist/electron.exe`（本项目目录 `npm install electron` 所得）
+3. 兼容：`bin/win32-x64/electron.exe`
 
-## ✅ 测试与 CI
+**拉取/安装 Electron 由使用者按自身环境执行**（例如 Windows 用户先 `npm install electron`），程序只负责"找到并配对路径"，不打包、不强制任何方式。
 
-- **契约测试**：`npm test`（Node 内置 `node --test`），覆盖 reducer 状态机的所有状态流转
+- **纯 Windows**：DSH 与桌宠同机运行，程序直接启动 Electron 窗口；runtime 就在本地目录，无需跨盘同步。
+- **WSL2**：DSH 在 WSL（Linux），桌宠窗口在 Windows。helper 自动把 runtime 与 `bin/` 中的 Windows 版 Electron 同步到 `C:\Users\<user>\AppData\Local\dsh-BFF-pet\` 后启动。
+  > 注意：WSL 下 `npm install electron` 拉取的是 Linux 版，**无法**驱动 Windows 桌宠；WSL 用户需放置 Windows 版 electron 于 `bin/win32-x64/`（或由 Agent 按环境处理）。
+
+## 测试与 CI
+
+- **契约测试**：`npm test`（Node 内置 `node --test`），覆盖 reducer 状态机 + helper 平台路径识别
 - **冒烟测试**：`npm run smoke`（syntax 检查所有 src/runtime JS + 契约测试）
 - **CI**：GitHub Actions 每次 push/PR 到 `main` 自动跑冒烟测试（`.github/workflows/ci.yml`）
 
 ```sh
-npm test        # 跑 reducer 契约测试
-npm run smoke   # 冒烟测试（语法 + 契约）
+npm test          # 跑 reducer + helper 契约测试
+npm test:helper   # 只跑 helper 平台路径测试
+npm run smoke     # 冒烟测试（语法 + 契约）
 ```
 
 ---

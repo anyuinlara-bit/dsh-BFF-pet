@@ -52,10 +52,18 @@ for (const f of mainFiles) {
 console.log('\n[3] reducer 契约测试')
 try {
   execSync('node --test src/reducer.test.js', { stdio: 'inherit', cwd: root })
-  // 测试输出已在前台，成功即无异常
 } catch (e) {
   failures++
   log(false, 'reducer 契约测试失败')
+}
+
+// 4. 运行 helper 纯逻辑测试（平台路径识别）
+console.log('\n[4] helper 纯逻辑测试')
+try {
+  execSync('node --test src/helper-process.test.js', { stdio: 'inherit', cwd: root })
+} catch (e) {
+  failures++
+  log(false, 'helper 纯逻辑测试失败')
 }
 
 console.log('\n──────────────────────')

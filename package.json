@@ -19,8 +19,9 @@
   },
   "author": "anyuinlara-bit",
   "scripts": {
-    "test": "node --test src/reducer.test.js",
+    "test": "node --test src/reducer.test.js src/helper-process.test.js",
     "test:reducer": "node --test src/reducer.test.js",
+    "test:helper": "node --test src/helper-process.test.js",
     "smoke": "node scripts/smoke.mjs"
   },
   "dsh": {
