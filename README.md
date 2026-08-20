@@ -19,6 +19,18 @@
 
 ---
 
+## 🎬 效果演示
+
+动画由 **Agent 实时状态驱动**——当 DSH 的 agent 接触信息、执行任务时，桌宠会播放对应的动画。以下是几个代表性场景：
+
+| 工作中 · 搜索 | 完成任务 | 吃 Token |
+|---|---|---|
+| ![工作中·搜索](docs/gifs/work_search.gif) | ![完成任务](docs/gifs/success_dance.gif) | ![吃Token](docs/gifs/eat_token.gif) |
+
+> 动画素材来自 [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)（见下方致谢），完整 50+ 个动画随桌宠运行自动触发。
+
+---
+
 ## 🏗️ 架构
 
 ```
@@ -89,10 +101,10 @@ npm run smoke   # 冒烟测试（语法 + 契约）
 
 本项目参考并借鉴了以下优秀的 DSH 桌宠插件，在此致谢：
 
-- **[dsh-pet](https://github.com/PC2005-cloud/dsh-pet)** — by [PC2005-cloud](https://github.com/PC2005-cloud)，MIT License。参考其桌宠形态与动画组织思路。
+- **[dsh-pet](https://github.com/PC2005-cloud/dsh-pet)** — by [PC2005-cloud](https://github.com/PC2005-cloud)，MIT License。**本项目的 50+ 个 WebM 动画素材即来自 dsh-pet**（经本地重命名为英文文件名后使用），感谢其精美的动画资产。
 - **[dsh-dafeiyu](https://github.com/QCYTSN/dsh-dafeiyu)** — by [QCYTSN](https://github.com/QCYTSN)，MIT License。参考其 WSL→Windows helper 桥接、状态机（reducer）与 webServer 端点设计。
 
-> 注意：本项目为独立实现，与上述项目无代码归属关系；动画资源、架构与实现均有所不同。若涉及复用，请遵守各项目对应的 MIT License 许可条款（保留版权声明）。
+> 注意：本项目的**架构与代码为独立实现**；动画素材复用自 dsh-pet。两个参考项目均为 MIT License，使用需遵循各自的许可条款（保留版权声明）。
 
 ---
 
