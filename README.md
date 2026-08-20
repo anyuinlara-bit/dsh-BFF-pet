@@ -31,48 +31,29 @@
 
 ---
 
-## 🏗️ 架构
+## 🔄 数据流（逻辑结构）
+
+桌宠的核心是**一条从 DSH 到桌宠的单向状态流 + 一条反向的控制流**，全部通过 DSH 自身的 webServer 完成，不引入额外通道。
 
 ```
-DSH (WSL)                        Windows Electron
-─────────────────────            ─────────────────────
-src/index.js  注册状态/退出端点     runtime/main.js   组装主进程
-src/reducer.js 状态机推导   ───▶   js/main/*.js      PetWindow/PetTray/PetMenu
-src/helper-process.js spawn同步    js/main/pet-state-poller.js   轮询状态
-src/errors.js  错误收集            js/pet-*.js       渲染层动画/互动/彩蛋
+DSH 侧（插件）                          Windows Electron 侧
+───────────                            ────────────────────
+Agent 产生事件                          桌宠窗口（透明 + 动画）
+   │                                        ▲
+   ▼                                        │ ipc/webContents 转发
+状态机推导（reducer）                        │
+   │                                        │
+   ▼                                        │
+状态端点暴露（GET /state）  ──轮询(1s)──▶  轮询器 → 渲染层 → 播放动画/气泡
+   │
+   ▼
+控制端点（POST /quit）  ◀──退出请求──── 托盘/右键菜单
 ```
 
-- **状态通道**：DSH 插件在自身 webServer 注册 `GET /plugins/dsh-BFF-pet/state`；Electron（Windows 进程）通过 WSL2 localhost 转发，每 1s 轮询一次，去重后转发给渲染层。
-- **退出控制**：`POST /plugins/dsh-BFF-pet/quit` 让 DSH helper 彻底停止（不再自动重启）。
+1. **状态流（正向）**：DSH 的 Agent 产生 `session/event` → 插件内状态机（`reducer`）把事件推导成宠物状态（空闲/思考/工作/等待/完成/错误）→ 通过状态端点 `GET /state` 暴露。Windows Electron 每秒轮询该端点，去重后转发给渲染层，驱动动画与气泡切换。
+2. **控制流（反向）**：托盘/右键菜单的用户动作（触发彩蛋、气泡开关、退出等）→ 渲染层处理，或通过控制端点 `POST /quit` 通知 DSH 彻底停止。
 
----
-
-## 🧩 模块结构（全部 class 化）
-
-**主进程（Electron main）**
-| 模块 | 职责 |
-|---|---|
-| `js/main/pet-window.js` | 透明窗口、拖拽、缩放(setBounds)、透明度、复位 |
-| `js/main/pet-state-poller.js` | 轮询 DSH 状态端点、断连检测、恢复 |
-| `js/main/pet-tray.js` | 系统托盘（点击切换、右键菜单） |
-| `js/main/pet-menu.js` | 右键菜单构建 |
-
-**渲染层（页面）**
-| 模块 | 职责 |
-|---|---|
-| `js/pet-state.js` | 动画配置映射 |
-| `js/pet-engine.js` | 双缓冲动画引擎 |
-| `js/pet-scheduler.js` | 彩蛋调度 |
-| `js/pet-interact.js` | 拖拽 + 点击互动 |
-| `js/pet-init.js` | 主程序组装 |
-
-**插件（DSH 侧）**
-| 模块 | 职责 |
-|---|---|
-| `src/index.js` | 注册状态/退出端点 |
-| `src/reducer.js` | Agent 事件 → 状态机 |
-| `src/helper-process.js` | WSL→Windows spawn、runtime 同步、退出管理 |
-| `src/errors.js` | 错误收集（暴露到状态端点） |
+两条流都只复用 DSH 自身的 `127.0.0.1:3080`，插件与 DSH 共生，无独立入口、无额外端口。
 
 ---
 
