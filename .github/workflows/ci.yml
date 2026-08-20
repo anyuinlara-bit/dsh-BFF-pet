@@ -26,7 +26,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm' # 无 lock 文件时代无害
+          # 注意：本项目无 npm 依赖，也无 package-lock.json，
+          # 因此不能配 cache: 'npm'（会在无 lock 文件时导致 setup 失败）
 
       - name: Run smoke test (syntax + reducer)
         run: npm run smoke
