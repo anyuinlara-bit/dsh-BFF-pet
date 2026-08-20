@@ -17,6 +17,7 @@
   "engines": {
     "node": ">=22.19"
   },
+  "author": "anyuinlara-bit",
   "scripts": {
     "test": "node --test src/reducer.test.js",
     "test:reducer": "node --test src/reducer.test.js",
